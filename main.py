@@ -584,6 +584,6 @@ def serve_pdf(path):
 
 
 
-if __name__ == '__main__':
-    app = dash.Dash(__name__)
-    server = app.server 
+app = dash.Dash(__name__)
+server = app.server  # Expose server for gunicorn
+
