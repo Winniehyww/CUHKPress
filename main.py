@@ -18,7 +18,7 @@ import difflib
 import json
 
 # Add PDF info file
-pdf_info_file = 'F:/data/1983articles.xlsx'
+pdf_info_file = './1983articles.xlsx'
 pdf_df = pd.read_excel(pdf_info_file)
 
 # Parse data from Markdown files
@@ -395,7 +395,7 @@ def display_event_details(clickData):
         pdf_similarities['index_mapping'] = index_mapping
         
         # Generate preview for first PDF
-        preview_element = generate_preview_image(f"F:/data/pdf/{pdf_files[0]}")
+        preview_element = generate_preview_image(f"./pdf/{pdf_files[0]}")
         
         for i, (idx, row) in enumerate(related_pdfs.iterrows()):
             pdf_file = row['pdf Name']
@@ -437,7 +437,7 @@ def generate_preview_image(pdf_path):
     
     try:
         # Create custom temp directory
-        custom_temp_dir = "F:/data/temp"
+        custom_temp_dir = "./temp"
         os.makedirs(custom_temp_dir, exist_ok=True)
         
         # Generate unique temp file name
@@ -508,7 +508,7 @@ def update_selected_pdf(button_clicks, pdf_paths, current_index, direct_match, p
         return current_index, dash.no_update, dash.no_update
     
     # 生成新的预览
-    preview = generate_preview_image(f"F:/data/pdf/{pdf_paths[clicked_index]}")
+    preview = generate_preview_image(f"./pdf/{pdf_paths[clicked_index]}")
     
     # 创建新的按钮组，更新所选按钮的颜色
     pdf_buttons = []
@@ -577,7 +577,7 @@ def display_full_pdf(n_clicks, pdf_index, pdf_paths):
 # Add route to serve PDF files with proper headers
 @app.server.route('/pdf_viewer/<path:path>')
 def serve_pdf(path):
-    response = send_from_directory('F:/data/pdf', path)
+    response = send_from_directory('./pdf', path)
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = 'inline; filename=%s' % path
     return response
