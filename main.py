@@ -583,11 +583,4 @@ def serve_pdf(path):
     return response
 
 
-
-app = dash.Dash(__name__)
 server = app.server  # Expose server for gunicorn
-
-app.layout = html.Div([
-    html.H1("Welcome to CUHKPress"),
-    html.P("This is your live Dash app deployed on Railway.")
-])
