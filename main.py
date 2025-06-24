@@ -18,7 +18,7 @@ import difflib
 import json
 
 # Add PDF info file
-pdf_info_file = './1983articles.xlsx'
+pdf_info_file = './pdf_index.xlsx'
 pdf_df = pd.read_excel(pdf_info_file)
 
 # Parse data from Markdown files
