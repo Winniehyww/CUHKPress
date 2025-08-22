@@ -1,0 +1,8 @@
+# Ignore all files in the pdf folder
+pdf/
+
+# Ignore all files in the Markdown folder
+Markdown/
+
+# Ignore 1983-1997 folder
+1983-
