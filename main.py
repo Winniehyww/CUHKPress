@@ -18,7 +18,7 @@ import difflib
 import json
 
 # Add PDF info file
-pdf_info_file = './pdf_index.xlsx'
+pdf_info_file = './index.xlsx'
 pdf_df = pd.read_excel(pdf_info_file)
 
 # Parse data from Markdown files
@@ -40,7 +40,10 @@ def parse_markdown_files(directory):
                 content = file.read()
                 
                 # Use regex to extract event blocks
-                event_blocks = re.findall(r'## (.+?)\s+\*\*Date:\*\* (.+?)\s+\*\*Content:\*\* (.+?)\s+\*\*Labels:\*\* (.+?)(?=\n---|\Z)', content, re.DOTALL)
+                event_blocks = re.findall(
+                    r'## (.+?)\s+\*\*Date:\*\* (.+?)\s+\*\*Content:\*\*([\s\S]+?)\*\*Labels:\*\* ([^\n]+)',
+                    content
+                )
                 
                 for block in event_blocks:
                     title = block[0].strip()
@@ -65,7 +68,7 @@ def parse_markdown_files(directory):
     return pd.DataFrame(all_data), list(all_labels)
 
 # Use test file path
-data_directory = 'F:/data'  # Data directory
+data_directory = './Markdown'  # Data directory
 df, all_labels = parse_markdown_files(data_directory)
 
 # Convert Date column to datetime format
@@ -164,7 +167,7 @@ def create_timeline(df, group='Category'):
                 name=key,
                 text=[f"Date: {date.strftime('%Y-%m-%d')}<br>Title: {title}" for date, title in zip(group_df['Date'], group_df['Article Title'])],  # Hover text
                 hoverinfo='text',
-                customdata=group_df.index  # For click events
+                customdata=group_df.index.to_list()  # For click events
             ), row=1, col=1)
 
     # Add pie chart
@@ -197,6 +200,9 @@ def create_timeline(df, group='Category'):
     return fig
 
 initial_fig = create_timeline(df)
+default_start = pd.Timestamp(year=1983, month=1, day=1)
+default_end = pd.Timestamp(year=1984, month=12, day=31)
+
 
 # Define app layout
 app.layout = dbc.Container([
@@ -216,8 +222,8 @@ app.layout = dbc.Container([
             id='date-picker-range',
             min_date_allowed=df['Date'].min(),
             max_date_allowed=df['Date'].max(),
-            start_date=df['Date'].min(),
-            end_date=df['Date'].max(),
+            start_date=default_start,
+            end_date=default_end,
             display_format='YYYY-MM-DD',
             className='mb-3'
         ), width=12)
@@ -230,9 +236,9 @@ app.layout = dbc.Container([
             id='time-slider',
             min=df['Date'].min().timestamp(),
             max=df['Date'].max().timestamp(),
-            value=[df['Date'].min().timestamp(), df['Date'].max().timestamp()],
-            marks={int(timestamp): pd.to_datetime(timestamp, unit='s').strftime('%Y-%m') 
-                  for timestamp in pd.date_range(df['Date'].min(), df['Date'].max(), freq='MS').astype(int) // 10**9},
+            value=[default_start.timestamp(), default_end.timestamp()],
+            marks={int(pd.Timestamp(year=year, month=1, day=1).timestamp()): str(year)
+                for year in range(df['Date'].min().year, df['Date'].max().year + 1)},
             step=86400
         ), width=12)
     ]),
@@ -335,7 +341,7 @@ def display_event_details(clickData):
     direct_match_found = False  # Flag to track if direct matches were found
     
     point_index = clickData['points'][0]['customdata']
-    event = df.iloc[point_index]
+    event = df.loc[point_index]
     event_title = event['Article Title']
     
     # Find related PDF files using flexible matching
@@ -583,4 +589,6 @@ def serve_pdf(path):
     return response
 
 
-server = app.server  # Expose server for gunicorn
+server = app.server
+# if __name__ == '__main__':
+#     app.run(debug=False)
