@@ -331,109 +331,91 @@ def update_timeline_and_sync_controls(search_text, selected_labels, start_date, 
      Output('current-pdf-index', 'data')],
     [Input('timeline-graph', 'clickData')]
 )
+
 def display_event_details(clickData):
     if not clickData:
         return html.P("Click on a point in the timeline to view details"), html.Div(), [], html.Div(), {}, False, 0
-    
-    # Initialize similarity_scores as empty list
+
     similarity_scores = []
-    pdf_similarities = {}  # Dictionary to store similarity scores for each PDF
-    direct_match_found = False  # Flag to track if direct matches were found
-    
-    point_index = clickData['points'][0]['customdata']
-    event = df.loc[point_index]
-    event_title = event['Article Title']
-    
-    # Find related PDF files using flexible matching
-    related_pdfs = pdf_df[
-        # Check if PDF title contains event title
-        pdf_df['Article Title'].str.contains(event_title, case=False, na=False) | 
-        # Or if event title contains PDF title
-        pdf_df['Article Title'].apply(lambda x: x.lower() in event_title.lower() if isinstance(x, str) else False)
-    ]
-    
-    # If direct matches found, set similarity to 100%
-    if not related_pdfs.empty:
-        direct_match_found = True
-        # Set 100% similarity for all directly matched PDFs
-        for idx in related_pdfs.index:
-            pdf_similarities[idx] = 1.0  # 100% similarity
-    
-    # If no related PDFs found, find the most similar ones
-    if related_pdfs.empty:
-        # Calculate similarity between event title and each PDF title
-        for idx, row in pdf_df.iterrows():
-            pdf_title = row['Article Title']
-            if isinstance(pdf_title, str) and isinstance(event_title, str):
-                # Use SequenceMatcher to calculate similarity
-                similarity = difflib.SequenceMatcher(None, pdf_title.lower(), event_title.lower()).ratio()
-                similarity_scores.append((idx, similarity))
-                pdf_similarities[idx] = similarity  # Save similarity score for each PDF
-        
-        # Sort by similarity in descending order
-        similarity_scores.sort(key=lambda x: x[1], reverse=True)
-        
-        # Take top 3 most similar PDFs
-        top_similar_indices = [idx for idx, _ in similarity_scores[:3]]
-        related_pdfs = pdf_df.iloc[top_similar_indices]
-    
-    # Create event details display
-    event_details = [
+    pdf_similarities = {}
+    direct_match_found = False
+
+    # Get event index
+    event_idx = clickData['points'][0]['customdata']
+    event = df.loc[event_idx]
+
+    # Show event details
+    event_details = html.Div([
         html.H4(event['Article Title']),
         html.P(f"Date: {event['Date'].strftime('%Y-%m-%d')}"),
         html.P(f"Category: {event['Category']}"),
         html.P(f"Tags: {event['Raw Labels']}"),
         html.H5("Content:"),
-        html.P(event['Content'])
-    ]
-    
-    # If related PDFs found, create PDF selector
-    if not related_pdfs.empty:
-        pdf_files = related_pdfs['pdf Name'].tolist()
-        pdf_buttons = []
-        
-        # 创建索引映射字典，保存按钮索引到原始PDF索引的映射
-        index_mapping = {}
-        for i, (idx, row) in enumerate(related_pdfs.iterrows()):
-            index_mapping[i] = idx
-        
-        # 将索引映射添加到pdf_similarities中
-        pdf_similarities['index_mapping'] = index_mapping
-        
-        # Generate preview for first PDF
-        preview_element = generate_preview_image(f"./pdf/{pdf_files[0]}")
-        
-        for i, (idx, row) in enumerate(related_pdfs.iterrows()):
-            pdf_file = row['pdf Name']
-            button_style = {'margin': '5px', 'backgroundColor': '#007bff' if i == 0 else '#6c757d'}
-            
-            # Add similarity score to button in percentage format
-            similarity_text = ""
-            if idx in pdf_similarities:
-                # Convert similarity to percentage format
-                similarity_percentage = int(pdf_similarities[idx] * 100)
-                similarity_text = f" (Match: {similarity_percentage}%)"
-                
-            pdf_buttons.append(
-                dbc.Button(
-                    f"Doc {i+1}: {pdf_file[:15]}...{similarity_text}",
-                    id={'type': 'pdf-button', 'index': i},
-                    style=button_style,
-                    className="me-2"
-                )
-            )
-        
-        pdf_selector = [
-            html.H5("Related Documents:" + (" (Direct Match)" if direct_match_found else " (Similarity Match)")),
-            html.Div(pdf_buttons, style={'display': 'flex', 'flexWrap': 'wrap'})
+        html.P(event['Content']),
+        html.Hr()
+    ])
+
+    # Only use the clicked event's date and title for PDF matching
+    clicked_date = event['Date']
+    pdf_candidates = pdf_df[pd.to_datetime(pdf_df['Date'], errors='coerce') == clicked_date]
+    related_pdfs = pd.DataFrame()
+    if not pdf_candidates.empty:
+        # Title direct matching
+        event_title = event['Article Title']
+        direct_match = pdf_candidates[
+            pdf_candidates['Article Title'].str.contains(event_title, case=False, na=False) |
+            pdf_candidates['Article Title'].apply(lambda x: x.lower() in event_title.lower() if isinstance(x, str) else False)
         ]
-        
-        # 将相似度信息转换为可JSON序列化的格式
-        pdf_similarities_json = {str(k): v for k, v in pdf_similarities.items()}
-        
-        return event_details, pdf_selector, pdf_files, preview_element, pdf_similarities_json, direct_match_found, 0
-    else:
+        if not direct_match.empty:
+            direct_match_found = True
+            for idx in direct_match.index:
+                pdf_similarities[idx] = 1.0
+            related_pdfs = pd.concat([related_pdfs, direct_match])
+        # If no direct match, perform similarity matching
+        if related_pdfs.empty:
+            for idx, row in pdf_candidates.iterrows():
+                pdf_title = row['Article Title']
+                if isinstance(pdf_title, str) and isinstance(event_title, str):
+                    similarity = difflib.SequenceMatcher(None, pdf_title.lower(), event_title.lower()).ratio()
+                    similarity_scores.append((idx, similarity))
+                    pdf_similarities[idx] = similarity
+            similarity_scores.sort(key=lambda x: x[1], reverse=True)
+            top_similar_indices = [idx for idx, _ in similarity_scores[:3]]
+            related_pdfs = pdf_candidates.loc[top_similar_indices]
+    # If no PDFs are available for the selected date, do not show related documents
+    if related_pdfs.empty:
         return event_details, html.Div("No related documents for this event"), [], html.Div(), {}, False, 0
+
+    # PDF selector logic remains unchanged
+    pdf_files = related_pdfs['pdf Name'].tolist()
+    pdf_buttons = []
+    index_mapping = {}
+    for i, (idx, row) in enumerate(related_pdfs.iterrows()):
+        index_mapping[i] = idx
+    pdf_similarities['index_mapping'] = index_mapping
+    preview_element = generate_preview_image(f"./pdf/{pdf_files[0]}")
+    for i, (idx, row) in enumerate(related_pdfs.iterrows()):
+        pdf_file = row['pdf Name']
+        button_style = {'margin': '5px', 'backgroundColor': '#007bff' if i == 0 else '#6c757d'}
+        similarity_text = ""
+        if idx in pdf_similarities:
+            similarity_percentage = int(pdf_similarities[idx] * 100)
+            similarity_text = f" (Match: {similarity_percentage}%)"
+        pdf_buttons.append(
+            dbc.Button(
+                f"Doc {i+1}: {pdf_file[:15]}...{similarity_text}",
+                id={'type': 'pdf-button', 'index': i},
+                style=button_style,
+                className="me-2"
+            )
+        )
+    pdf_selector = [
+        html.H5("Related Documents:" + (" (Direct Match)" if direct_match_found else " (Similarity Match)")),
+        html.Div(pdf_buttons, style={'display': 'flex', 'flexWrap': 'wrap'})
+    ]
+    pdf_similarities_json = {str(k): v for k, v in pdf_similarities.items()}
+    return event_details, pdf_selector, pdf_files, preview_element, pdf_similarities_json, direct_match_found, 0
+
 
 # Helper function to generate PDF preview image
 def generate_preview_image(pdf_path):
@@ -589,6 +571,6 @@ def serve_pdf(path):
     return response
 
 
-server = app.server
-# if __name__ == '__main__':
-#     app.run(debug=False)
+# server = app.server
+if __name__ == '__main__':
+    app.run(debug=False)
