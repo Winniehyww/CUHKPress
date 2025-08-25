@@ -45,4 +45,4 @@ See `requirements.txt` for full dependencies.
 
 ## 📝 License & Attribution
 
-This project is for academic and research purposes. Original data and documents are attributed to CUHK University Press Archive.
+This project is for academic and research purposes. Original data and documents are attributed to CUHK University Press Archive. The processed dataset of the project could be requested by emailing data@cuhk.edu.hk.
